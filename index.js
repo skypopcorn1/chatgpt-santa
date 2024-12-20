@@ -25,6 +25,8 @@ const LOG_EVENT_TYPES = [
 // Load environment variables
 const { OPENAI_API_KEY } = process.env;
 
+console.log("Starting Santa Call Center...");
+console.log("OpenAI API Key:", OPENAI_API_KEY);
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -85,15 +87,19 @@ wss.on("connection", (connection) => {
 
   try {
     console.log("Client connected");
-    const openAiWs = new WebSocket(
-      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "OpenAI-Beta": "realtime=v1",
-        },
-      }
-    );
+    try {
+      const openAiWs = new WebSocket(
+        "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
+        {
+          headers: {
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+            "OpenAI-Beta": "realtime=v1",
+          },
+        }
+      );
+    } catch (error) {
+      console.error("Open AI WebSocket initialization error:", error);
+    }
     let streamSid = null;
     const sendSessionUpdate = () => {
       const sessionUpdate = {
