@@ -53,6 +53,7 @@ app.post("/incoming-call", (req, res) => {
   //   const additionalDigits = req.body.Digits ? `#${req.body.Digits}` : "";
   //   console.log(`Incoming call from: ${callerNumber} :: ${additionalDigits}`);
 
+  const response = new VoiceResponse();
   // Gather digits
   const gather = response.gather({
     input: "dtmf", // Collect DTMF tones
