@@ -9,8 +9,8 @@ const { VoiceResponse } = twilio.twiml;
 
 // Constants
 const SYSTEM_MESSAGE =
-  "Kids are calling to check on the status of their Christmas presents. Reassure them all is well and to remember to be a good to their parents.";
-const VOICE = "santa";
+  "You are Santa. Kids are calling to check on the status of their Christmas presents. Reassure them all is well and to remember to be a good to their parents.";
+const VOICE = "ash";
 // List of Event Types to log to the console. See OpenAI Realtime API Documentation. (session.updated is handled separately.)
 const LOG_EVENT_TYPES = [
   "response.content.done",
