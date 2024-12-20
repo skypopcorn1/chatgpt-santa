@@ -49,6 +49,10 @@ app.post("/incoming-call", (req, res) => {
     return res.status(403).send("Forbidden");
   }
 
+  const callerNumber = req.body.From;
+  const additionalDigits = req.body.Digits ? `#${req.body.Digits}` : "";
+  console.log(`Incoming call from: ${callerNumber} :: ${additionalDigits}`);
+
   const response = new VoiceResponse();
   const connect = response.connect();
   connect.stream({
