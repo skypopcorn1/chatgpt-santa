@@ -49,18 +49,50 @@ app.post("/incoming-call", (req, res) => {
     return res.status(403).send("Forbidden");
   }
 
-  const callerNumber = req.body.From;
-  const additionalDigits = req.body.Digits ? `#${req.body.Digits}` : "";
-  console.log(`Incoming call from: ${callerNumber} :: ${additionalDigits}`);
+  //   const callerNumber = req.body.From;
+  //   const additionalDigits = req.body.Digits ? `#${req.body.Digits}` : "";
+  //   console.log(`Incoming call from: ${callerNumber} :: ${additionalDigits}`);
+
+  // Gather digits
+  const gather = response.gather({
+    input: "dtmf", // Collect DTMF tones
+    action: "/process-gather", // URL to handle the gathered input
+    method: "POST",
+    timeout: 5, // Wait time for input
+    numDigits: 5, // Maximum number of digits to gather
+  });
+  gather.say("Please enter the additional numbers followed by the pound sign.");
+
+  // If no input is received, fall back to a default action
+  response.say("We did not receive your input. Connecting you to Santa now.");
+
+  // Respond with the initial TwiML
+  console.log(response.toString());
+  res.type("text/xml");
+  res.send(response.toString());
+  console.log(response.toString());
+});
+
+app.post("/process-gather", (req, res) => {
+  const digits = req.body.Digits;
+  console.log(`Digits received: ${digits}`);
 
   const response = new VoiceResponse();
+
+  if (digits) {
+    // Log the digits and proceed with the connection
+    console.log(`Connecting with additional input: ${digits}`);
+    response.say("Connecting you to Santa now");
+  } else {
+    // Handle missing input
+    response.say("No input received. Connecting you to Santa now.");
+  }
   const connect = response.connect();
   connect.stream({
     name: "Santa Audio Stream",
     url: `wss://${req.headers.host}/media-stream`,
     track: "inbound_track",
   });
-  response.say("Thanks for calling. Connecting you to Santa now.");
   console.log("Received incoming call from Twilio. \n", response.toString());
   res.type("text/xml");
   res.send(response.toString());
