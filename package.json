@@ -1,0 +1,21 @@
+{
+  "name": "santa",
+  "version": "1.0.0",
+  "description": "A voice caller endpoint for Santa",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "express": "^4.21.2",
+    "twilio": "^5.4.0",
+    "uuid": "^11.0.3",
+    "ws": "^8.18.0",
+    "xml-js": "^1.6.11",
+    "xml2js": "^0.6.2"
+  }
+}
