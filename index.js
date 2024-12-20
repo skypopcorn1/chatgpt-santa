@@ -2,7 +2,7 @@ import express from "express";
 import bodyParser from "body-parser";
 import fs from "fs";
 import { js2xml } from "xml-js";
-import { WebSocketServer } from "ws";
+import { WebSocket, WebSocketServer } from "ws";
 import { v4 as uuidv4 } from "uuid";
 import twilio from "twilio";
 const { VoiceResponse } = twilio.twiml;
