@@ -12,7 +12,7 @@ const DEFAULT_SYSTEM_MESSAGE =
   "You are Santa. Kids are calling to check on the status of their Christmas presents.";
 
 const SYSTEM_MESSAGES = {
-  1086: "You are Santa. Michael has called you. He asked his parents, Ya koo and Pee tray for a special beyblade. Ask him questions about what he wants and reassure him that you are working hard to make his Christmas special.",
+  1086: "You are Santa. Michael has called you. He asked his parents, Yakoo and Peetray for a special beyblade. Ask him questions about what he wants and reassure him that you are working hard to make his Christmas special.",
 };
 
 const SYSTEM_MESSAGE_APPEND = " Remember to be a good to their parents.";
@@ -132,10 +132,6 @@ let sessionId = uuidv4();
 wss.on("connection", (connection) => {
   console.log("Twilio media stream connected.");
 
-  // --- STEP 3: Connect to OpenAI Realtime API ---
-  //   const openAiUrl =
-  //     "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17";
-
   try {
     console.log("Client connected");
     const openAiWs = new WebSocket(
@@ -149,52 +145,48 @@ wss.on("connection", (connection) => {
     );
 
     let streamSid = null;
-    console.log("Confirming system message:", SYSTEM_MESSAGE);
-    const sendSessionUpdate = () => {
-      const sessionUpdate = {
-        type: "session.update",
-        session: {
-          turn_detection: { type: "server_vad" },
-          input_audio_format: "g711_ulaw",
-          output_audio_format: "g711_ulaw",
-          voice: VOICE,
-          instructions: SYSTEM_MESSAGE,
+
+    const createConversation = () => {
+      const conversationCreateEvent = {
+        type: "conversation.create",
+        conversation: {
+          messages: [
+            {
+              role: "system",
+              content: SYSTEM_MESSAGE + SYSTEM_MESSAGE_APPEND, // Define the system instructions here
+            },
+          ],
           modalities: ["text", "audio"],
-          temperature: 0.8,
         },
       };
-      console.log("Sending session update:", JSON.stringify(sessionUpdate));
-      openAiWs.send(JSON.stringify(sessionUpdate));
-
-      // Send initial message immediately
-      const initialMessage = {
-        type: "input.text",
-        text: "Hello! This is Santa speaking. How can I help you today?",
-      };
-      console.log("Sending initial message:", JSON.stringify(initialMessage));
-      openAiWs.send(JSON.stringify(initialMessage));
+      console.log(
+        "Sending conversation.create event:",
+        JSON.stringify(conversationCreateEvent)
+      );
+      openAiWs.send(JSON.stringify(conversationCreateEvent));
     };
+
     // Open event for OpenAI WebSocket
     openAiWs.on("open", () => {
       console.log("Connected to the OpenAI Realtime API");
-      setTimeout(sendSessionUpdate, 250); // Ensure connection stability, send after .25 seconds
+      setTimeout(createConversation, 250); // Trigger conversation creation
     });
-    // Listen for messages from the OpenAI WebSocket (and send to Twilio if necessary)
+
+    // Handle incoming messages from OpenAI
     openAiWs.on("message", (data) => {
       try {
         const response = JSON.parse(data);
         if (LOG_EVENT_TYPES.includes(response.type)) {
           console.log(`Received event: ${response.type}`, response);
         }
-        if (response.type === "session.updated") {
-          console.log("Session updated successfully:", response);
-        }
-        if (response.type === "response.audio.delta" && response.delta) {
+        if (response.type === "conversation.response" && response.response) {
           const audioDelta = {
             event: "media",
             streamSid: streamSid,
             media: {
-              payload: Buffer.from(response.delta, "base64").toString("base64"),
+              payload: Buffer.from(response.response.audio, "base64").toString(
+                "base64"
+              ),
             },
           };
           connection.send(JSON.stringify(audioDelta));
@@ -235,11 +227,13 @@ wss.on("connection", (connection) => {
         console.error("Error parsing message:", error, "Message:", message);
       }
     });
+
     // Handle connection close
     connection.on("close", () => {
       if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
       console.log("Client disconnected.");
     });
+
     // Handle WebSocket close and errors
     openAiWs.on("close", () => {
       console.log("Disconnected from the OpenAI Realtime API");
