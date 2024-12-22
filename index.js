@@ -96,6 +96,7 @@ app.post("/process-gather", (req, res) => {
     response.say("Connecting you to Santa now");
     if (SYSTEM_MESSAGES[digits]) {
       SYSTEM_MESSAGE = SYSTEM_MESSAGES[digits];
+      console.log("System message updated:", SYSTEM_MESSAGE);
     }
   } else {
     // Handle missing input
@@ -148,6 +149,7 @@ wss.on("connection", (connection) => {
     );
 
     let streamSid = null;
+    console.log("Confirming system message:", SYSTEM_MESSAGE);
     const sendSessionUpdate = () => {
       const sessionUpdate = {
         type: "session.update",
