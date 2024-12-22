@@ -8,8 +8,17 @@ import twilio from "twilio";
 const { VoiceResponse } = twilio.twiml;
 
 // Constants
-const SYSTEM_MESSAGE =
-  "You are Santa. Kids are calling to check on the status of their Christmas presents. Reassure them all is well and to remember to be a good to their parents.";
+const DEFAULT_SYSTEM_MESSAGE =
+  "You are Santa. Kids are calling to check on the status of their Christmas presents.";
+
+const SYSTEM_MESSAGES = {
+  1086: "You are Santa. Michael has called you. He asked his parents, Jaco (pronounced Ya koo) and Pietre (pronounced Pee tray) for a special beyblade. Ask him questions about what he wants and reassure him that you are working hard to make his Christmas special.",
+};
+
+const SYSTEM_MESSAGE_APPEND = " Remember to be a good to their parents.";
+
+let SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE;
+
 const VOICE = "ash";
 // List of Event Types to log to the console. See OpenAI Realtime API Documentation. (session.updated is handled separately.)
 const LOG_EVENT_TYPES = [
@@ -84,6 +93,9 @@ app.post("/process-gather", (req, res) => {
     // Log the digits and proceed with the connection
     console.log(`Connecting with additional input: ${digits}`);
     response.say("Connecting you to Santa now");
+    if (SYSTEM_MESSAGES[digits]) {
+      SYSTEM_MESSAGE = SYSTEM_MESSAGES[digits];
+    }
   } else {
     // Handle missing input
     response.say("No input received. Connecting you to Santa now.");
@@ -150,6 +162,14 @@ wss.on("connection", (connection) => {
       };
       console.log("Sending session update:", JSON.stringify(sessionUpdate));
       openAiWs.send(JSON.stringify(sessionUpdate));
+
+      // Send initial message immediately
+      const initialMessage = {
+        type: "input.text",
+        text: "Hello! This is Santa speaking. How can I help you today?",
+      };
+      console.log("Sending initial message:", JSON.stringify(initialMessage));
+      openAiWs.send(JSON.stringify(initialMessage));
     };
     // Open event for OpenAI WebSocket
     openAiWs.on("open", () => {
