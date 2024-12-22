@@ -146,30 +146,35 @@ wss.on("connection", (connection) => {
 
     let streamSid = null;
 
-    const createConversation = () => {
-      const conversationCreateEvent = {
-        type: "conversation.create",
-        conversation: {
-          messages: [
-            {
-              role: "system",
-              content: SYSTEM_MESSAGE + SYSTEM_MESSAGE_APPEND, // Define the system instructions here
-            },
-          ],
+    const sendSessionUpdate = () => {
+      const sessionUpdate = {
+        type: "session.update",
+        session: {
+          turn_detection: { type: "server_vad" },
+          input_audio_format: "g711_ulaw",
+          output_audio_format: "g711_ulaw",
+          voice: VOICE,
+          instructions: SYSTEM_MESSAGE + SYSTEM_MESSAGE_APPEND,
           modalities: ["text", "audio"],
+          temperature: 0.8,
         },
       };
-      console.log(
-        "Sending conversation.create event:",
-        JSON.stringify(conversationCreateEvent)
-      );
-      openAiWs.send(JSON.stringify(conversationCreateEvent));
+      console.log("Sending session update:", JSON.stringify(sessionUpdate));
+      openAiWs.send(JSON.stringify(sessionUpdate));
+
+      // Send initial audio buffer to say "Hello"
+      const initialAudioBuffer = {
+        type: "input_audio_buffer.append",
+        audio: Buffer.from("Hello Santa").toString("base64"),
+      };
+      console.log("Sending initial audio buffer:", initialAudioBuffer);
+      openAiWs.send(JSON.stringify(initialAudioBuffer));
     };
 
     // Open event for OpenAI WebSocket
     openAiWs.on("open", () => {
       console.log("Connected to the OpenAI Realtime API");
-      setTimeout(createConversation, 250); // Trigger conversation creation
+      setTimeout(sendSessionUpdate, 250); // Ensure connection stability
     });
 
     // Handle incoming messages from OpenAI
@@ -179,14 +184,15 @@ wss.on("connection", (connection) => {
         if (LOG_EVENT_TYPES.includes(response.type)) {
           console.log(`Received event: ${response.type}`, response);
         }
-        if (response.type === "conversation.response" && response.response) {
+        if (response.type === "session.updated") {
+          console.log("Session updated successfully:", response);
+        }
+        if (response.type === "response.audio.delta" && response.delta) {
           const audioDelta = {
             event: "media",
             streamSid: streamSid,
             media: {
-              payload: Buffer.from(response.response.audio, "base64").toString(
-                "base64"
-              ),
+              payload: Buffer.from(response.delta, "base64").toString("base64"),
             },
           };
           connection.send(JSON.stringify(audioDelta));
