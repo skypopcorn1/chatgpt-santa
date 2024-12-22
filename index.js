@@ -72,10 +72,15 @@ app.post("/incoming-call", (req, res) => {
     timeout: 5, // Wait time for input
     numDigits: 5, // Maximum number of digits to gather
   });
-  gather.say("Please enter the additional numbers followed by the pound sign.");
+  gather.play(
+    "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T03_58_14_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s50_sb75_t2.mp3?alt=media&token=47ff63e4-62ba-40f4-a6d0-6f1c827b7573"
+  );
+  //   gather.say("Please enter the additional numbers followed by the pound sign.");
 
   // If no input is received, fall back to a default action
-  response.say("We did not receive your input. Connecting you to Santa now.");
+  response.play(
+    "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_04_08_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s50_sb75_t2.mp3?alt=media&token=5f941861-6b6b-49d1-8c38-500da6d86f24"
+  );
 
   // Respond with the initial TwiML
   console.log(response.toString());
@@ -93,14 +98,18 @@ app.post("/process-gather", (req, res) => {
   if (digits) {
     // Log the digits and proceed with the connection
     console.log(`Connecting with additional input: ${digits}`);
-    response.say("Connecting you to Santa now");
+    response.play(
+      "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_05_58_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s71_sb75_t2.mp3?alt=media&token=f1ffc462-9cb6-4f58-a381-992abee01519"
+    );
     if (SYSTEM_MESSAGES[digits]) {
       SYSTEM_MESSAGE = SYSTEM_MESSAGES[digits];
       console.log("System message updated:", SYSTEM_MESSAGE);
     }
   } else {
     // Handle missing input
-    response.say("No input received. Connecting you to Santa now.");
+    response.play(
+      "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_04_08_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s50_sb75_t2.mp3?alt=media&token=5f941861-6b6b-49d1-8c38-500da6d86f24"
+    );
   }
   const connect = response.connect();
   connect.stream({
