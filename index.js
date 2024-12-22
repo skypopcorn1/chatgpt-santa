@@ -12,6 +12,7 @@ const DEFAULT_SYSTEM_MESSAGE =
   "You are Santa. Kids are calling to check on the status of their Christmas presents.";
 
 const SYSTEM_MESSAGES = {
+  1: DEFAULT_SYSTEM_MESSAGE,
   1086: "You are Santa. Michael has called you. He asked his parents, Yakoo and Peetray for a special beyblade. Ask him questions about what he wants and reassure him that you are working hard to make his Christmas special.",
   72580:
     "You are Santa. You have been called by Elise. Elise loves to read fantasy books, loves to travel, loves degustations / food and really enjoys time at the beach. Elise works at a charity helping people with blindness and low vision. She has worked really long hours and weekends this year to support her charity. She even has to travel over the Christmas holiday to a charity event and will miss some time at home with family, but she will be back on Christmas Eve just in time for Christmas. Ask him questions about what he wants and reassure him that you are working hard to make his Christmas special.",
@@ -77,7 +78,7 @@ app.post("/incoming-call", (req, res) => {
     numDigits: 5, // Maximum number of digits to gather
   });
   gather.play(
-    "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T03_58_14_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s50_sb75_t2.mp3?alt=media&token=47ff63e4-62ba-40f4-a6d0-6f1c827b7573"
+    "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/north_pole_greeting.mp3?alt=media&token=54e08421-dcfc-464c-a6ac-69d376f1273d"
   );
   //   gather.say("Please enter the additional numbers followed by the pound sign.");
 
