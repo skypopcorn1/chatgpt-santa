@@ -138,10 +138,36 @@ const wss = new WebSocketServer({ server, path: "/media-stream" });
 // Unique session identifier
 let sessionId = uuidv4();
 
-wss.on("connection", (connection) => {
+const INITIAL_ULAW_AUDIO_URL =
+  "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_22_47_River_pre_s5_sb19_t2%20(1).wav?alt=media&token=911b340d-fb82-445f-b174-244e3f4e7197";
+
+// 2) Utility to fetch the G.711 file, convert to base64
+async function fetchUlawBase64(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch G.711 file: ${res.status}`);
+  }
+  const arrayBuf = await res.arrayBuffer();
+  const audioBuffer = Buffer.from(arrayBuf);
+  // Convert raw G.711 data to base64
+  return audioBuffer.toString("base64");
+}
+
+wss.on("connection", async (connection) => {
   console.log("Twilio media stream connected.");
 
   try {
+    // We'll fetch the G.711 base64 *before* we open the OpenAI socket,
+    // so it's ready to send immediately.
+    let initialUlawBase64;
+    try {
+      initialUlawBase64 = await fetchUlawBase64(INITIAL_ULAW_AUDIO_URL);
+      console.log("Fetched initial G.711 µ-law audio successfully");
+    } catch (error) {
+      console.error("Error fetching initial G.711 audio:", error);
+      // Optionally continue without initial audio or exit early
+    }
+
     console.log("Client connected");
     const openAiWs = new WebSocket(
       "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
@@ -172,12 +198,20 @@ wss.on("connection", (connection) => {
       openAiWs.send(JSON.stringify(sessionUpdate));
 
       // Send initial audio buffer to say "Hello"
-      const initialAudioBuffer = {
-        type: "input_audio_buffer.append",
-        audio: Buffer.from("Hello Santa").toString("base64"),
-      };
-      console.log("Sending initial audio buffer:", initialAudioBuffer);
-      openAiWs.send(JSON.stringify(initialAudioBuffer));
+      // If we successfully fetched the G.711 audio,
+      // send it as the first audio chunk
+      if (initialUlawBase64) {
+        const initialAudioBuffer = {
+          type: "input_audio_buffer.append",
+          audio: initialUlawBase64,
+        };
+        console.log("Sending initial audio buffer:", initialAudioBuffer);
+        openAiWs.send(JSON.stringify(initialAudioBuffer));
+      } else {
+        console.warn(
+          "No initialUlawBase64 found; skipping initial audio append."
+        );
+      }
     };
 
     // Open event for OpenAI WebSocket
