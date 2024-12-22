@@ -32,10 +32,11 @@ const LOG_EVENT_TYPES = [
 ];
 
 // Load environment variables
-const { OPENAI_API_KEY } = process.env;
+const { OPENAI_API_KEY, TWILIO_AUTH_TOKEN } = process.env;
 
 console.log("Starting Santa Call Center...");
 console.log("OpenAI API Key:", OPENAI_API_KEY);
+console.log("Twilio Auth Token:", TWILIO_AUTH_TOKEN);
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -47,7 +48,7 @@ app.post("/incoming-call", (req, res) => {
   const signature = req.headers["x-twilio-signature"];
   const url = `https://${req.headers.host}${req.originalUrl}`;
   const isValid = twilio.validateRequest(
-    process.env.TWILIO_AUTH_TOKEN,
+    TWILIO_AUTH_TOKEN,
     signature,
     url,
     req.body
