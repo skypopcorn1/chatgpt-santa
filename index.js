@@ -138,10 +138,36 @@ const wss = new WebSocketServer({ server, path: "/media-stream" });
 // Unique session identifier
 let sessionId = uuidv4();
 
+const INITIAL_ULAW_AUDIO_URL =
+  "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/hello_santa.ulaw?alt=media&token=5054c8a6-8b95-4742-a2ba-696f721139d6";
+
+// 2) Utility to fetch the G.711 file, convert to base64
+async function fetchUlawBase64(url) {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch G.711 file: ${res.status}`);
+  }
+  const arrayBuf = await res.arrayBuffer();
+  const audioBuffer = Buffer.from(arrayBuf);
+  // Convert raw G.711 data to base64
+  return audioBuffer.toString("base64");
+}
+
 wss.on("connection", (connection) => {
   console.log("Twilio media stream connected.");
 
   try {
+    // (1) Read your G.711 µ-law file from disk and base64-encode it
+    // In this example, "hello.ul" is a raw 8 kHz G.711 µ-law file
+    let initialAudioBase64 = null;
+    try {
+      const audioFileBuffer = fs.readFileSync("./bin/hello_santa.ulaw"); // or an absolute path
+      initialAudioBase64 = audioFileBuffer.toString("base64");
+      console.log("Successfully loaded and encoded hello_santa.ulaw");
+    } catch (err) {
+      console.error("Failed to read hello.ul:", err);
+    }
+
     console.log("Client connected");
     const openAiWs = new WebSocket(
       "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
@@ -171,10 +197,18 @@ wss.on("connection", (connection) => {
       console.log("Sending session update:", JSON.stringify(sessionUpdate));
       openAiWs.send(JSON.stringify(sessionUpdate));
 
-      const response = new VoiceResponse();
-      response.play(
-        "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_05_58_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s71_sb75_t2.mp3?alt=media&token=f1ffc462-9cb6-4f58-a381-992abee01519"
-      );
+      // (2) Send initial audio buffer if we have it
+      // Replace the "Hello Santa" string with your actual G.711 data
+      if (initialAudioBase64) {
+        const initialAudioBuffer = {
+          type: "input_audio_buffer.append",
+          audio: initialAudioBase64,
+        };
+        console.log("Sending initial audio buffer:", initialAudioBuffer);
+        openAiWs.send(JSON.stringify(initialAudioBuffer));
+      } else {
+        console.log("No initial audio file was loaded.");
+      }
     };
 
     // Open event for OpenAI WebSocket
