@@ -141,185 +141,174 @@ const server = app.listen(PORT, () => {
 // Create a WebSocket server for Twilio media streams
 const wss = new WebSocketServer({ server, path: "/media-stream" });
 
-// Unique session identifier
-let sessionId = uuidv4();
+// Keep track of sessions: { [streamSid]: { openAiWs, ... } }
+const sessions = {};
 
-const INITIAL_ULAW_AUDIO_URL =
-  "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/hello_santa.ulaw?alt=media&token=5054c8a6-8b95-4742-a2ba-696f721139d6";
-
-// 2) Utility to fetch the G.711 file, convert to base64
-async function fetchUlawBase64(url) {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch G.711 file: ${res.status}`);
+// Load your G.711 µ-law file once at startup, if desired
+function getInitialAudio() {
+  try {
+    const audioFileBuffer = fs.readFileSync("./bin/hello_santa.ulaw");
+    return audioFileBuffer.toString("base64");
+  } catch (err) {
+    console.error("Failed to read hello_santa.ulaw:", err);
+    return null;
   }
-  const arrayBuf = await res.arrayBuffer();
-  const audioBuffer = Buffer.from(arrayBuf);
-  // Convert raw G.711 data to base64
-  return audioBuffer.toString("base64");
 }
+const initialAudioBase64 = getInitialAudio();
 
 wss.on("connection", (connection) => {
-  console.log("Twilio media stream connected.");
+  console.log("Twilio media stream connected. Client connected.");
 
-  try {
-    // (1) Read your G.711 µ-law file from disk and base64-encode it
-    // In this example, "hello.ul" is a raw 8 kHz G.711 µ-law file
-    let initialAudioBase64 = null;
+  // Listen for Twilio messages
+  connection.on("message", async (message) => {
     try {
-      const audioFileBuffer = fs.readFileSync("./bin/hello_santa.ulaw"); // or an absolute path
-      initialAudioBase64 = audioFileBuffer.toString("base64");
-      console.log("Successfully loaded and encoded hello_santa.ulaw");
-    } catch (err) {
-      console.error("Failed to read hello.ul:", err);
-    }
+      const data = JSON.parse(message);
 
-    console.log("Client connected");
-    const openAiWs = new WebSocket(
-      "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
-      {
-        headers: {
-          Authorization: `Bearer ${OPENAI_API_KEY}`,
-          "OpenAI-Beta": "realtime=v1",
-        },
-      }
-    );
+      switch (data.event) {
+        case "start": {
+          // A new call is starting
+          const streamSid = data.start.streamSid;
+          console.log("Incoming stream has started", streamSid);
 
-    let streamSid = null;
-
-    const sendSessionUpdate = () => {
-      const sessionUpdate = {
-        type: "session.update",
-        session: {
-          turn_detection: { type: "server_vad" },
-          input_audio_format: "g711_ulaw",
-          output_audio_format: "g711_ulaw",
-          voice: VOICE,
-          instructions: SYSTEM_MESSAGE + SYSTEM_MESSAGE_APPEND,
-          modalities: ["text", "audio"],
-          temperature: 0.8,
-        },
-      };
-      console.log("Sending session update:", JSON.stringify(sessionUpdate));
-      openAiWs.send(JSON.stringify(sessionUpdate));
-
-      // (2) Send initial audio buffer if we have it
-      // Replace the "Hello Santa" string with your actual G.711 data
-      if (initialAudioBase64) {
-        const initialAudioBuffer = {
-          type: "input_audio_buffer.append",
-          audio: initialAudioBase64,
-        };
-        console.log("Sending initial audio buffer:", initialAudioBuffer);
-        openAiWs.send(JSON.stringify(initialAudioBuffer));
-      } else {
-        console.log("No initial audio file was loaded.");
-      }
-    };
-
-    // Open event for OpenAI WebSocket
-    openAiWs.on("open", () => {
-      console.log("Connected to the OpenAI Realtime API");
-      setTimeout(sendSessionUpdate, 250); // Ensure connection stability
-    });
-
-    // Handle incoming messages from OpenAI
-    openAiWs.on("message", (data) => {
-      try {
-        const response = JSON.parse(data);
-        if (LOG_EVENT_TYPES.includes(response.type)) {
-          console.log(`Received event: ${response.type}`, response);
-        }
-        if (response.type === "session.updated") {
-          console.log("Session updated successfully:", response);
-        }
-        if (response.type === "response.audio.delta" && response.delta) {
-          const audioDelta = {
-            event: "media",
-            streamSid: streamSid,
-            media: {
-              payload: Buffer.from(response.delta, "base64").toString("base64"),
-            },
-          };
-          connection.send(JSON.stringify(audioDelta));
-        }
-      } catch (error) {
-        console.error(
-          "Error processing OpenAI message:",
-          error,
-          "Raw message:",
-          data
-        );
-      }
-    });
-
-    // Handle incoming messages from Twilio
-    connection.on("message", (message) => {
-      try {
-        const data = JSON.parse(message);
-        switch (data.event) {
-          case "media":
-            if (openAiWs.readyState === WebSocket.OPEN) {
-              const audioAppend = {
-                type: "input_audio_buffer.append",
-                audio: data.media.payload,
-              };
-              openAiWs.send(JSON.stringify(audioAppend));
+          // 1) Create a new OpenAI Realtime WS for this call
+          const openAiWs = new WebSocket(
+            "wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17",
+            {
+              headers: {
+                Authorization: `Bearer ${OPENAI_API_KEY}`,
+                "OpenAI-Beta": "realtime=v1",
+              },
             }
-            break;
-          case "start":
-            streamSid = data.start.streamSid;
-            console.log("Incoming stream has started", streamSid);
-            break;
-          default:
-            console.log("Received non-media event:", data.event);
-            break;
+          );
+
+          // 2) Store it in sessions
+          sessions[streamSid] = { openAiWs };
+
+          // 3) When OpenAI WS opens, send session.update and initial audio
+          openAiWs.on("open", () => {
+            console.log(`Connected to OpenAI Realtime for ${streamSid}`);
+
+            // Prepare session update
+            const sessionUpdate = {
+              type: "session.update",
+              session: {
+                turn_detection: { type: "server_vad" },
+                input_audio_format: "g711_ulaw",
+                output_audio_format: "g711_ulaw",
+                voice: VOICE,
+                instructions: SYSTEM_MESSAGE + SYSTEM_MESSAGE_APPEND,
+                modalities: ["text", "audio"],
+                temperature: 0.8,
+              },
+            };
+            openAiWs.send(JSON.stringify(sessionUpdate));
+
+            // Send initial audio if loaded
+
+            if (initialAudioBase64) {
+              const initialAudioEvent = {
+                type: "input_audio_buffer.append",
+                audio: initialAudioBase64,
+              };
+              console.log("Sending initial audio buffer for", streamSid);
+              openAiWs.send(JSON.stringify(initialAudioEvent));
+            } else {
+              console.log("No initial audio file was loaded.");
+            }
+          });
+
+          // 4) Handle messages from OpenAI
+          openAiWs.on("message", (openAiMsg) => {
+            try {
+              const response = JSON.parse(openAiMsg);
+
+              // Log certain events
+              if (LOG_EVENT_TYPES.includes(response.type)) {
+                console.log(`Received event: ${response.type}`, response);
+              }
+
+              if (response.type === "session.updated") {
+                console.log("Session updated successfully:", response);
+              }
+
+              if (response.type === "response.audio.delta" && response.delta) {
+                // This is TTS audio from OpenAI in base64
+                // We send it back to Twilio
+                const audioDelta = {
+                  event: "media",
+                  streamSid: streamSid,
+                  media: {
+                    payload: Buffer.from(response.delta, "base64").toString(
+                      "base64"
+                    ),
+                  },
+                };
+                connection.send(JSON.stringify(audioDelta));
+              }
+            } catch (err) {
+              console.error(
+                "Error processing OpenAI message:",
+                err,
+                "Raw message:",
+                openAiMsg
+              );
+            }
+          });
+
+          // 5) Handle close/error on the OpenAI WS
+          openAiWs.on("close", () => {
+            console.log(`OpenAI WS closed for ${streamSid}`);
+          });
+          openAiWs.on("error", (err) => {
+            console.error(`OpenAI WS error for ${streamSid}:`, err);
+          });
+
+          break; // end 'start' case
         }
-      } catch (error) {
-        console.error("Error parsing message:", error, "Message:", message);
+
+        case "media": {
+          // This is raw audio from Twilio in base64 G.711
+          const streamSid = data.streamSid;
+          // Retrieve the session
+          const session = sessions[streamSid];
+          if (session && session.openAiWs.readyState === WebSocket.OPEN) {
+            const audioAppend = {
+              type: "input_audio_buffer.append",
+              audio: data.media.payload,
+            };
+            session.openAiWs.send(JSON.stringify(audioAppend));
+          }
+          break;
+        }
+
+        case "stop":
+          // The call/stream ended
+          // Cleanup if needed
+          // Possibly close the openAiWs
+          // e.g.:
+          const streamToStop = data.streamSid;
+          console.log("Stopping call for", streamToStop);
+          if (sessions[streamToStop]) {
+            if (sessions[streamToStop].openAiWs.readyState === WebSocket.OPEN) {
+              sessions[streamToStop].openAiWs.close();
+            }
+            delete sessions[streamToStop];
+          }
+          break;
+
+        default:
+          console.log("Received non-media event:", data.event);
+          break;
       }
-    });
+    } catch (error) {
+      console.error("Error parsing message:", error, "Message:", message);
+    }
+  });
 
-    // Handle connection close
-    connection.on("close", () => {
-      if (openAiWs.readyState === WebSocket.OPEN) openAiWs.close();
-      console.log("Client disconnected.");
-    });
-
-    // Handle WebSocket close and errors
-    openAiWs.on("close", () => {
-      console.log("Disconnected from the OpenAI Realtime API");
-    });
-    openAiWs.on("error", (error) => {
-      console.error("Error in the OpenAI WebSocket:", error);
-    });
-  } catch (error) {
-    console.error("Error initializing OpenAI WebSocket:", error);
-  }
-});
-
-// --- STEP 4: Endpoint to serve the generated audio TwiML ---
-
-app.post("/play-generated-audio", (req, res) => {
-  const response = {
-    Response: {
-      Play: {
-        _text: `https://${req.headers.host}/generated_audio_${sessionId}.wav`,
-      },
-    },
-  };
-  const twiml = js2xml(response, { compact: true });
-  res.set("Content-Type", "text/xml");
-  res.send(twiml);
-});
-
-// --- STEP 5: Serve the generated audio file ---
-app.get(`/generated_audio_${sessionId}.wav`, (req, res) => {
-  const file = `./generated_audio_${sessionId}.wav`;
-  if (fs.existsSync(file)) {
-    res.set("Content-Type", "audio/wav");
-    fs.createReadStream(file).pipe(res);
-  } else {
-    res.status(404).send("Not found");
-  }
+  // Handle the WebSocket server connection close
+  connection.on("close", () => {
+    console.log("Twilio connection closed by the client.");
+    // If you want to further clean up sessions here, you could do so.
+    // However, typically Twilio will send a "stop" event for each streamSid.
+  });
 });
