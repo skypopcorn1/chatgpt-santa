@@ -104,16 +104,15 @@ app.post("/process-gather", (req, res) => {
 
   const response = new VoiceResponse();
 
-  if (digits) {
+  if (digits && SYSTEM_MESSAGES[digits]) {
     // Log the digits and proceed with the connection
     console.log(`Connecting with additional input: ${digits}`);
     response.play(
       "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_05_58_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s71_sb75_t2.mp3?alt=media&token=f1ffc462-9cb6-4f58-a381-992abee01519"
     );
-    if (SYSTEM_MESSAGES[digits]) {
-      SYSTEM_MESSAGE = SYSTEM_MESSAGES[digits];
-      console.log("System message updated:", SYSTEM_MESSAGE);
-    }
+
+    SYSTEM_MESSAGE = SYSTEM_MESSAGES[digits];
+    console.log("System message updated:", SYSTEM_MESSAGE);
   } else {
     // Handle missing input
     console.log(
