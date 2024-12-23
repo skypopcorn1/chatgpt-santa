@@ -119,6 +119,7 @@ app.post("/process-gather", (req, res) => {
     console.log(
       "/process-gather: No additional input received. Connecting without additional input."
     );
+    SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE;
     response.play(
       "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/ElevenLabs_2024-12-22T04_04_08_Father%20Christmas%20-%20magical%20storyteller%2C%20older%20British%20English%20male_pvc_s50_sb75_t2.mp3?alt=media&token=5f941861-6b6b-49d1-8c38-500da6d86f24"
     );
