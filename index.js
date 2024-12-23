@@ -77,6 +77,7 @@ app.post("/incoming-call", (req, res) => {
     method: "POST",
     timeout: 5, // Wait time for input
     numDigits: 5, // Maximum number of digits to gather
+    actionOnEmptyResult: true, // Ensures the call will continue even if no input is received
   });
   gather.play(
     "https://firebasestorage.googleapis.com/v0/b/tdu-taupo-classic.firebasestorage.app/o/north_pole_greeting.mp3?alt=media&token=54e08421-dcfc-464c-a6ac-69d376f1273d"
